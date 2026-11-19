@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منظومة الفواتير الضريبية للصيدليات</title>
+    <!-- تحميل Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- تحميل خط Cairo و Tajawal للغة العربية الاحترافية -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- أيقونات FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Cairo', 'Tajawal', sans-serif;
+            background: radial-gradient(circle at top right, #ecfdf5 0%, #f1f5f9 45%, #e2e8f0 100%);
+            background-attachment: fixed;
+        }
+
+        /* تأثيرات زجاجية ناعمة */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        /* إخفاء أسهم حقول الأرقام لتصميم أنظف */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        /* تخصيص شريط التمرير */
+        ::-webkit-scrollbar {
+            width: 7px;
+            height: 7px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0d9488;
+        }
+
+        /* تنسيقات الطباعة الحرارية 80mm */
+        #thermal-receipt-area {
+            display: none;
+        }
+
+        @media print {
+            @page {
+                size: 80mm auto;
+                margin: 0mm;
+            }
+            body {
+                background: #ffffff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 80mm !important;
+            }
+            /* إخفاء كل واجهة التطبيق أثناء الطباعة */
+            #app-wrapper, #toast-container, #history-modal, #settings-modal {
+                display: none !important;
+            }
+            /* إظهار إيصال الطباعة الحرارية فقط */
+            #thermal-receipt-area {
+                display: block !important;
+                width: 76mm !important;
+                margin: 0 auto !important;
+                padding: 3mm 2mm !important;
+                color: #000000 !important;
+                font-family: 'Cairo', sans-serif !important;
+                font-size: 11px !important;
+                line-height: 1.35 !important;
+                background: #fff !important;
+            }
+            .receipt-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 6px;
+                margin-bottom: 6px;
+            }
+            .receipt-table th, .receipt-table td {
+                border: 1px solid #000 !important;
+                padding: 2px 3px;
+                text-align: center;
+                font-size: 10px;
+            }
+            .receipt-table th {
+                background-color: #f3f4f6 !important;
+                -webkit-print-color-adjust: exact;
+                font-weight: 800;
+            }
+            .text-right-important {
+                text-align: right !important;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col selection:bg-teal-600 selection:text-white">
+
+    <!-- حاوية الإشعارات (بديل alert) -->
+    <div id="toast-container" class="fixed top-5 left-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- واجهة التطبيق الرئيسية (تختفي عند الطباعة) -->
+    <div id="app-wrapper" class="flex-grow flex flex-col">
+        
+        <!-- الشريط العلوي العصري -->
+        <header class="sticky top-0 z-40 bg-gradient-to-l from-slate-900 via-teal-900 to-emerald-900 text-white shadow-xl border-b border-white/10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3.5">
+                    <!-- شعار الصيدلة SVG (كأس هيجيا) بتصميم حديث -->
+                    <div class="bg-gradient-to-br from-teal-400/20 to-emerald-400/10 p-2.5 rounded-2xl backdrop-blur-md border border-teal-300/30 shadow-inner">
+                        <svg class="w-8 h-8 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2v20M8 6h8M7 6c0 4 2 6 5 6s5-2 5-6M9 22h6M12 12c-2.5 0-4 1.5-4 3.5S10.5 19 13 19s3.5-1.5 3.5-3"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-lg sm:text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-l from-white to-teal-100">منظومة الفواتير الضريبية</h1>
+                            <span class="hidden md:inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                                سحابي آمن
+                            </span>
+                        </div>
+                        <p class="text-xs text-teal-200/90 mt-0.5" id="header-subtitle">نظام الإدارة الذكي والطباعة الحرارية ٨٠ مم للصيدليات</p>
+                    </div>
+                </div>
+
+                <!-- أزرار التحكم عند تسجيل الدخول -->
+                <div id="header-actions" class="hidden flex items-center gap-2 sm:gap-2.5">
+                    <button type="button" onclick="openSettingsModal()" class="bg-white/10 hover:bg-white/20 active:scale-95 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 border border-white/15 shadow-sm">
+                        <i class="fa-solid fa-sliders text-teal-300"></i>
+                        <span class="hidden sm:inline">إعدادات الصيدلية</span>
+                    </button>
+                    <button type="button" onclick="openHistoryModal()" class="bg-white/10 hover:bg-white/20 active:scale-95 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 border border-white/15 shadow-sm">
+                        <i class="fa-solid fa-box-archive text-amber-300"></i>
+                        <span>سجل الفواتير</span>
+                    </button>
+                    <button type="button" onclick="logoutPharmacy()" class="bg-rose-500/80 hover:bg-rose-600 active:scale-95 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-md border border-rose-400/30">
+                        <i class="fa-solid fa-power-off"></i>
+                        <span class="hidden sm:inline">خروج</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- المحتوى الرئيسي -->
+        <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-9">
+
+            <!-- ========================================== -->
+            <!-- القسم الأول: بوابة التسجيل وتسجيل الدخول     -->
+            <!-- ========================================== -->
+            <section id="auth-section" class="max-w-lg mx-auto mt-2 sm:mt-6">
+                <div class="glass-card rounded-3xl shadow-2xl border border-white/80 overflow-hidden">
+                    <!-- شريط علوي جمالي -->
+                    <div class="h-2 bg-gradient-to-l from-teal-500 via-emerald-500 to-cyan-500"></div>
+
+                    <!-- أزرار التبديل بين الدخول والتسجيل -->
+                    <div class="grid grid-cols-2 p-2 bg-slate-100/80 m-4 rounded-2xl border border-slate-200/80">
+                        <button type="button" id="tab-login" onclick="switchAuthTab('login')" class="py-2.5 text-center font-extrabold text-sm rounded-xl text-teal-800 bg-white shadow-sm transition-all">
+                            <i class="fa-solid fa-shield-halved ml-1.5 text-teal-600"></i> تسجيل الدخول
+                        </button>
+                        <button type="button" id="tab-register" onclick="switchAuthTab('register')" class="py-2.5 text-center font-bold text-sm rounded-xl text-slate-500 hover:text-teal-700 transition-all">
+                            <i class="fa-solid fa-hospital-user ml-1.5"></i> تسجيل صيدلية جديدة
+                        </button>
+                    </div>
+
+                    <!-- نموذج تسجيل الدخول -->
+                    <form id="login-form" onsubmit="handleLogin(event)" class="px-6 pb-8 pt-2 sm:px-8 space-y-5">
+                        <div class="text-center mb-5">
+                            <div class="w-14 h-14 bg-gradient-to-br from-teal-50 to-emerald-100 text-teal-700 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3 border border-teal-200/70 shadow-sm">
+                                <i class="fa-solid fa-staff-snake"></i>
+                            </div>
+                            <h2 class="text-xl sm:text-2xl font-black text-slate-800">بوابة الصيدليات الذكية</h2>
+                            <p class="text-xs sm:text-sm text-slate-500 mt-1">أدخل السجل التجاري والرقم السري (بالأرقام العربية أو الإنجليزية)</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1.5">رقم السجل التجاري (كود المنشأة)</label>
+                            <div class="relative group">
+                                <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 group-focus-within:text-teal-600 transition">
+                                    <i class="fa-solid fa-hashtag"></i>
+                                </span>
+                                <input type="text" id="login-cr" required autocomplete="username" placeholder="مثال: ٢٢٥٠ أو 2250" class="w-full pr-10 pl-4 py-3 rounded-xl border border-slate-300/90 bg-white/80 focus:bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none transition font-bold text-slate-800">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1.5">الرقم السري</label>
+                            <div class="relative group">
+                                <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 group-focus-within:text-teal-600 transition">
+                                    <i class="fa-solid fa-key"></i>
+                                </span>
+                                <input type="password" id="login-pass" required autocomplete="current-password" placeholder="••••••••" class="w-full pr-10 pl-4 py-3 rounded-xl border border-slate-300/90 bg-white/80 focus:bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none transition font-bold text-slate-800">
+                            </div>
+                        </div>
+
+                        <button type="submit" id="btn-login-submit" class="w-full bg-gradient-to-l from-teal-700 to-emerald-600 hover:from-teal-800 hover:to-emerald-700 active:scale-[0.99] text-white font-extrabold py-3.5 rounded-xl shadow-lg shadow-teal-600/20 hover:shadow-xl transition-all flex items-center justify-center gap-2.5">
+                            <span>دخول آمن إلى المنظومة</span>
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                    </form>
+
+                    <!-- نموذج تسجيل صيدلية جديدة -->
+                    <form id="register-form" onsubmit="handleRegister(event)" class="hidden px-6 pb-8 pt-2 sm:px-8 space-y-4">
+                        <div class="text-center mb-3">
+                            <h2 class="text-xl font-black text-slate-800">إنشاء حساب صيدلية جديد</h2>
+                            <p class="text-xs text-slate-500 mt-1">سيتم إنشاء كود منشأة فريد برقم السجل التجاري وتشفير بياناتك</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">اسم الصيدلية <span class="text-rose-500">*</span></label>
+                            <input type="text" id="reg-name" required placeholder="مثال: صيدلية د/ وائل حافظ الكبرى" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-semibold text-sm">
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <div>
+                                <label class="block text-xs font-extrabold text-slate-700 mb-1">السجل التجاري (كود الدخول) <span class="text-rose-500">*</span></label>
+                                <input type="text" id="reg-cr" required placeholder="مثال: ٢٢٥٠" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-semibold text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-extrabold text-slate-700 mb-1">رقم البطاقة الضريبية (ب.ض) <span class="text-rose-500">*</span></label>
+                                <input type="text" id="reg-tax" required placeholder="مثال: ٥-١٧٩-١٨١-٠٠-٢٧" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-semibold text-sm">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <div>
+                                <label class="block text-xs font-extrabold text-slate-700 mb-1">رقم التليفون الأرضي <span class="text-rose-500">*</span></label>
+                                <input type="tel" id="reg-phone" required placeholder="مثال: ٢٦٢٧١٨٨٨" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-semibold text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-extrabold text-slate-700 mb-1">الرقم السري <span class="text-rose-500">*</span></label>
+                                <input type="password" id="reg-pass" required placeholder="٤ أحرف أو أرقام على الأقل" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-semibold text-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">عنوان الصيدلية بالتفصيل <span class="text-rose-500">*</span></label>
+                            <input type="text" id="reg-address" required placeholder="مثال: مساكن القاهرة ج أمام المطحن مدينة السلام" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-semibold text-sm">
+                        </div>
+
+                        <button type="submit" id="btn-reg-submit" class="w-full bg-gradient-to-l from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] text-white font-extrabold py-3.5 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 mt-2">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                            <span>تسجيل الصيدلية في قاعدة البيانات</span>
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- ========================================== -->
+            <!-- القسم الثاني: لوحة عمل الفواتير الضريبية     -->
+            <!-- ========================================== -->
+            <section id="dashboard-section" class="hidden space-y-6">
+                
+                <!-- بطاقة ترويسة بيانات الصيدلية المسجلة -->
+                <div class="glass-card rounded-3xl shadow-md border border-white p-5 sm:p-6 flex flex-wrap items-center justify-between gap-4 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-teal-500 to-emerald-600"></div>
+                    <div class="flex items-center gap-4 pr-2">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white flex items-center justify-center text-2xl shadow-md shadow-teal-600/20">
+                            <i class="fa-solid fa-staff-snake"></i>
+                        </div>
+                        <div>
+                            <h2 id="disp-pharm-name" class="text-lg sm:text-2xl font-black text-slate-800">اسم الصيدلية</h2>
+                            <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-bold text-slate-600 mt-1.5">
+                                <span class="bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/80"><strong class="text-teal-700">ب.ض:</strong> <span id="disp-pharm-tax">-</span></span>
+                                <span class="bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/80"><strong class="text-teal-700">سجل تجاري:</strong> <span id="disp-pharm-cr">-</span></span>
+                                <span class="bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/80"><strong class="text-teal-700">تليفون:</strong> <span id="disp-pharm-phone">-</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-rose-50 to-amber-50 px-5 py-3 rounded-2xl border border-rose-200/80 text-center sm:text-left shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-500 block">رقم الفاتورة الضريبية</span>
+                        <span id="disp-invoice-number" class="text-2xl font-black text-rose-600 tracking-wider">٠٠٠١</span>
+                    </div>
+                </div>
+
+                <!-- بطاقة بيانات المريض والتاريخ -->
+                <div class="glass-card rounded-3xl shadow-md border border-white p-5 sm:p-6">
+                    <h3 class="text-sm sm:text-base font-extrabold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-200/80 pb-3">
+                        <span class="w-7 h-7 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-user-injured"></i>
+                        </span>
+                        <span>بيانات العميل / المريض وتاريخ الفاتورة</span>
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1.5">اسم المريض أو الجهة</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                                    <i class="fa-solid fa-user"></i>
+                                </span>
+                                <input type="text" id="patient-name" placeholder="أدخل اسم المريض أو اتركه فارغاً لـ (عميل نقدي)..." class="w-full pr-10 pl-4 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-semibold text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1.5">تاريخ الفاتورة</label>
+                            <input type="date" id="invoice-date" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-bold text-sm text-slate-700">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- بطاقة جدول الأصناف -->
+                <div class="glass-card rounded-3xl shadow-md border border-white overflow-hidden">
+                    <div class="p-5 sm:px-6 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-l from-slate-50 to-white">
+                        <h3 class="text-sm sm:text-base font-extrabold text-slate-800 flex items-center gap-2">
+                            <span class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs">
+                                <i class="fa-solid fa-pills"></i>
+                            </span>
+                            <span>أصناف الفاتورة الضريبية</span>
+                        </h3>
+                        <button type="button" onclick="addItemRow()" class="bg-teal-600 hover:bg-teal-700 active:scale-95 text-white text-xs sm:text-sm font-extrabold px-4 py-2.5 rounded-xl shadow-md shadow-teal-600/20 transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>إضافة صنف جديد</span>
+                        </button>
+                    </div>
+
+                    <!-- حاوية متجاوبة للجدول -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse min-w-[780px]">
+                            <thead>
+                                <tr class="bg-slate-100/90 text-slate-700 text-xs sm:text-sm border-b border-slate-300">
+                                    <th class="py-3 px-3 text-center w-12 border-l border-slate-200 font-extrabold">م</th>
+                                    <th class="py-3 px-3 border-l border-slate-200 font-extrabold">اسم الصنف</th>
+                                    <th class="py-3 px-3 text-center w-28 border-l border-slate-200 font-extrabold">نوع الوحدة</th>
+                                    <th class="py-3 px-3 text-center w-24 border-l border-slate-200 font-extrabold">العدد</th>
+                                    <th class="py-2 px-2 text-center w-44 border-l border-slate-200 bg-amber-50/50" colspan="2">
+                                        <div class="border-b border-slate-300 pb-1 mb-1 font-extrabold text-amber-900">قيمة للقطعة</div>
+                                        <div class="grid grid-cols-2 text-xs text-slate-600 font-bold">
+                                            <span class="border-l border-slate-300">قرش</span>
+                                            <span>جنيه</span>
+                                        </div>
+                                    </th>
+                                    <th class="py-2 px-2 text-center w-44 border-l border-slate-200 bg-teal-50/50" colspan="2">
+                                        <div class="border-b border-slate-300 pb-1 mb-1 font-extrabold text-teal-900">الإجمالي</div>
+                                        <div class="grid grid-cols-2 text-xs text-slate-600 font-bold">
+                                            <span class="border-l border-slate-300">قرش</span>
+                                            <span>جنيه</span>
+                                        </div>
+                                    </th>
+                                    <th class="py-3 px-2 text-center w-14 font-extrabold">حذف</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoice-items-body" class="divide-y divide-slate-200 text-sm bg-white/60">
+                                <!-- الصفوف تضاف ديناميكياً هنا -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- تذييل الجدول: الإجمالي والتفقيط بالعربية -->
+                    <div class="bg-slate-50/90 p-5 sm:p-6 border-t border-slate-200 space-y-5">
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+                            <!-- فقط وقدره (التفقيط بالعربية) -->
+                            <div class="lg:col-span-8 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-center">
+                                <span class="text-xs font-extrabold text-teal-700 flex items-center gap-1.5 mb-1.5">
+                                    <i class="fa-solid fa-pen-nib"></i>
+                                    <span>فقط وقدره (التفقيط باللغة العربية):</span>
+                                </span>
+                                <p id="total-arabic-words" class="text-base sm:text-lg font-black text-slate-800 leading-relaxed">صفر جنيهاً مصرياً لا غير</p>
+                            </div>
+
+                            <!-- الإجمالي الرقمي مقسم جنيه وقرش -->
+                            <div class="lg:col-span-4 bg-gradient-to-br from-slate-900 via-teal-900 to-emerald-900 text-white p-4 sm:p-5 rounded-2xl shadow-lg flex items-center justify-between border border-teal-700/50">
+                                <div>
+                                    <span class="text-xs text-teal-200 font-bold block mb-1">الإجمالي الكلي للفاتورة</span>
+                                    <div class="flex items-baseline gap-1">
+                                        <span class="text-2xl sm:text-3xl font-black tracking-wide text-white" id="grand-total-display">٠.٠٠</span>
+                                        <span class="text-xs font-bold text-emerald-300">ج.م</span>
+                                    </div>
+                                </div>
+                                <div class="text-left border-r border-white/15 pr-4 space-y-1">
+                                    <div class="text-xs text-teal-200">جنيه: <strong id="grand-total-pounds" class="text-white text-base font-black">٠</strong></div>
+                                    <div class="text-xs text-teal-200">قرش: <strong id="grand-total-piasters" class="text-amber-300 text-base font-black">٠٠</strong></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- أزرار الحفظ والطباعة -->
+                        <div class="flex flex-wrap items-center justify-end gap-3 pt-1">
+                            <button type="button" onclick="resetInvoiceForm()" class="px-5 py-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 active:scale-95 text-slate-700 font-extrabold text-sm transition-all flex items-center gap-2 shadow-sm">
+                                <i class="fa-solid fa-rotate-right text-slate-500"></i>
+                                <span>فاتورة جديدة / تفريغ</span>
+                            </button>
+                            <button type="button" onclick="saveAndPrintInvoice()" id="btn-save-print" class="px-6 py-3 rounded-xl bg-gradient-to-l from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 active:scale-95 text-white font-extrabold text-sm sm:text-base shadow-lg shadow-teal-600/25 hover:shadow-xl transition-all flex items-center gap-2.5">
+                                <i class="fa-solid fa-print"></i>
+                                <span>حفظ في قاعدة البيانات وطباعة ٨٠ مم</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- نافذة منبثقة لعرض سجل الفواتير والبحث المتقدم وإعادة الطباعة -->
+    <!-- ========================================================== -->
+    <div id="history-modal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+            <!-- رأس النافذة -->
+            <div class="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-l from-slate-900 via-teal-900 to-teal-800 text-white">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/15 p-2.5 rounded-xl border border-white/15">
+                        <i class="fa-solid fa-file-invoice-dollar text-lg text-amber-300"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base sm:text-lg font-black">أرشيف وسجل الفواتير الضريبية</h3>
+                        <p class="text-xs text-teal-200">ابحث برقم الفاتورة أو اسم العميل لإعادة المعاينة والطباعة الحرارية</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeHistoryModal()" class="text-white/80 hover:text-white hover:bg-white/10 rounded-xl p-2 transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- شريط البحث والفلترة الفورية -->
+            <div class="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                <div class="sm:col-span-8 relative">
+                    <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" id="history-search-input" oninput="filterHistoryInvoices()" placeholder="ابحث برقم الفاتورة (مثلاً: ٠٠٠٥) أو اسم العميل / المريض..." class="w-full pr-10 pl-4 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none text-sm font-bold">
+                </div>
+                <div class="sm:col-span-4 flex items-center justify-between sm:justify-end gap-2">
+                    <span id="history-count-badge" class="bg-teal-100 text-teal-900 text-xs font-black px-3.5 py-2 rounded-xl border border-teal-200">
+                        ٠ فاتورة
+                    </span>
+                    <button type="button" onclick="openHistoryModal(true)" class="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 p-2.5 rounded-xl text-sm transition shadow-sm" title="تحديث السجل من السحابة">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- قائمة الفواتير -->
+            <div id="history-list-container" class="p-4 sm:p-5 overflow-y-auto flex-grow space-y-3 bg-slate-100/60">
+                <!-- يتم تحميل الفواتير هنا -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- نافذة منبثقة لتعديل بيانات الصيدلية وتغيير الرقم السري      -->
+    <!-- ========================================================== -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+            <!-- رأس النافذة -->
+            <div class="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-l from-slate-900 via-teal-900 to-emerald-800 text-white">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/15 p-2.5 rounded-xl border border-white/15">
+                        <i class="fa-solid fa-sliders text-lg text-teal-300"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base sm:text-lg font-black">إعدادات الصيدلية والأمان</h3>
+                        <p class="text-xs text-teal-200">تحديث البيانات الضريبية والعنوان أو تغيير الرقم السري</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeSettingsModal()" class="text-white/80 hover:text-white hover:bg-white/10 rounded-xl p-2 transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- نموذج التعديل -->
+            <form id="settings-form" onsubmit="handleUpdatePharmacySettings(event)" class="p-5 sm:p-6 overflow-y-auto space-y-5">
+                
+                <!-- القسم الأول: البيانات الأساسية والضريبية -->
+                <div class="space-y-4">
+                    <h4 class="text-sm font-black text-teal-800 border-b border-slate-200 pb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-building-shield"></i>
+                        <span>البيانات الضريبية والإدارية</span>
+                    </h4>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-500 mb-1">كود المنشأة (السجل التجاري - ثابت)</label>
+                            <input type="text" id="set-cr" disabled class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 font-extrabold cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">اسم الصيدلية <span class="text-rose-500">*</span></label>
+                            <input type="text" id="set-name" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-bold">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">رقم البطاقة الضريبية (ب.ض) <span class="text-rose-500">*</span></label>
+                            <input type="text" id="set-tax" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">رقم التليفون الأرضي <span class="text-rose-500">*</span></label>
+                            <input type="tel" id="set-phone" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-bold">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-extrabold text-slate-700 mb-1">عنوان الصيدلية <span class="text-rose-500">*</span></label>
+                        <input type="text" id="set-address" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-bold">
+                    </div>
+                </div>
+
+                <!-- القسم الثاني: تغيير الرقم السري (اختياري) -->
+                <div class="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-3">
+                    <h4 class="text-sm font-black text-amber-900 flex items-center gap-2">
+                        <i class="fa-solid fa-key text-amber-600"></i>
+                        <span>تغيير الرقم السري (اترك الحقول فارغة إذا كنت لا ترغب في تغييره)</span>
+                    </h4>
+
+                    <div>
+                        <label class="block text-xs font-extrabold text-slate-700 mb-1">الرقم السري الحالي (مطلوب فقط عند تغيير الرقم السري)</label>
+                        <input type="password" id="set-old-pass" placeholder="أدخل الرقم السري الحالي للتحقق" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-amber-500 outline-none text-sm font-semibold">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">الرقم السري الجديد</label>
+                            <input type="password" id="set-new-pass" placeholder="٤ أحرف أو أرقام على الأقل" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-amber-500 outline-none text-sm font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">تأكيد الرقم السري الجديد</label>
+                            <input type="password" id="set-confirm-pass" placeholder="أعد كتابة الرقم السري الجديد" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-amber-500 outline-none text-sm font-semibold">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- أزرار الحفظ والإلغاء -->
+                <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="closeSettingsModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-extrabold text-sm transition">
+                        إلغاء
+                    </button>
+                    <button type="submit" id="btn-save-settings" class="px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-sm shadow-md transition flex items-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>حفظ التعديلات سحابياً</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- البرمجة المنطقية المؤمنة والربط السحابي عالي الأداء         -->
+    <!-- ========================================================== -->
+    <script>
+        "use strict";
+
+        /**
+         * طبقة الأمان والتشفير (Security & Obfuscation Layer)
+         * تشفير رابط قاعدة البيانات باستخدام مصفوفة XOR لمنع كشفه كنص صريح
+         */
+        const _Vault = (() => {
+            const _k = 0x5A;
+            const _p = [
+                50, 46, 46, 42, 41, 96, 117, 117, 51, 52, 44, 53, 51, 57, 63, 119,
+                56, 111, 108, 109, 106, 119, 62, 63, 60, 59, 47, 54, 46, 119, 40, 46,
+                62, 56, 116, 60, 51, 40, 63, 56, 59, 41, 63, 51, 53, 116, 57, 53, 55
+            ];
+            return Object.freeze({
+                endpoint: () => _p.map(b => String.fromCharCode(b ^ _k)).join('')
+            });
+        })();
+
+        // تحويل الأرقام العربية الشرقية (٠-٩) إلى قياسية (0-9) للمعالجة والتطابق
+        function toEnglishDigits(str) {
+            if (str === null || str === undefined) return '';
+            const arabicNums = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+            return String(str).replace(/[٠-٩]/g, d => arabicNums.indexOf(d));
+        }
+
+        // تحويل الأرقام القياسية (0-9) إلى أرقام عربية (٠-٩) للعرض والطباعة
+        function toArabicDigits(str) {
+            if (str === null || str === undefined) return '';
+            const arabicNums = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+            return String(str).replace(/[0-9]/g, d => arabicNums[parseInt(d, 10)]);
+        }
+
+        // تعقيم النصوص لمنع هجمات XSS
+        function escapeHTML(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // تشفير الرقم السري بخوارزمية SHA-256 مع توحيد الأرقام العربية والإنجليزية
+        async function hashPasswordSHA256(plainText, salt) {
+            const normalizedPass = toEnglishDigits(plainText.trim());
+            const normalizedSalt = toEnglishDigits(salt.trim());
+            const rawString = `${normalizedSalt}::${normalizedPass}::PHARM_SEC_2026`;
+            if (window.crypto && window.crypto.subtle) {
+                try {
+                    const encoder = new TextEncoder();
+                    const data = encoder.encode(rawString);
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                    const hashArray = Array.from(new Uint8Array(hashBuffer));
+                    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                } catch (e) {
+                    // التراجع للتشفير البرمجي في حال التشغيل من ملف محلي غير آمن
+                }
+            }
+            let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+            for (let i = 0; i < rawString.length; i++) {
+                const ch = rawString.charCodeAt(i);
+                h1 = Math.imul(h1 ^ ch, 2654435761);
+                h2 = Math.imul(h2 ^ ch, 1597334677);
+            }
+            h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+            h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+            return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+        }
+
+        // حالة التطبيق الحالية في الذاكرة
+        let currentPharmacy = null;
+        let currentInvoiceNumber = 1;
+        let rowCounter = 0;
+        let cachedInvoicesList = [];
+
+        // تهيئة الصفحة عند التحميل
+        window.addEventListener('DOMContentLoaded', () => {
+            setTodayDate();
+            const savedSession = sessionStorage.getItem('active_pharmacy_v2');
+            if (savedSession) {
+                try {
+                    currentPharmacy = JSON.parse(savedSession);
+                    enterDashboard();
+                } catch (e) {
+                    sessionStorage.removeItem('active_pharmacy_v2');
+                }
+            }
+        });
+
+        // تعيين تاريخ اليوم تلقائياً
+        function setTodayDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const dateInput = document.getElementById('invoice-date');
+            if (dateInput) dateInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+
+        // نظام الإشعارات الاحترافي (بديل alert)
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                success: 'bg-emerald-600 text-white border-emerald-700',
+                error: 'bg-rose-600 text-white border-rose-700',
+                info: 'bg-teal-800 text-white border-teal-900'
+            };
+            const icons = {
+                success: 'fa-circle-check',
+                error: 'fa-circle-exclamation',
+                info: 'fa-circle-info'
+            };
+
+            toast.className = `${colors[type]} border px-4 py-3.5 rounded-2xl shadow-xl flex items-center gap-3 text-xs sm:text-sm font-extrabold pointer-events-auto transform transition-all duration-300 translate-y-0 opacity-100`;
+            toast.innerHTML = `
+                <i class="fa-solid ${icons[type]} text-lg"></i>
+                <span class="flex-grow leading-snug">${escapeHTML(message)}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // التبديل بين تبويب الدخول والتسجيل
+        function switchAuthTab(tab) {
+            const loginForm = document.getElementById('login-form');
+            const regForm = document.getElementById('register-form');
+            const tabLogin = document.getElementById('tab-login');
+            const tabReg = document.getElementById('tab-register');
+
+            if (tab === 'login') {
+                loginForm.classList.remove('hidden');
+                regForm.classList.add('hidden');
+                tabLogin.className = "py-2.5 text-center font-extrabold text-sm rounded-xl text-teal-800 bg-white shadow-sm transition-all";
+                tabReg.className = "py-2.5 text-center font-bold text-sm rounded-xl text-slate-500 hover:text-teal-700 transition-all";
+            } else {
+                loginForm.classList.add('hidden');
+                regForm.classList.remove('hidden');
+                tabReg.className = "py-2.5 text-center font-extrabold text-sm rounded-xl text-teal-800 bg-white shadow-sm transition-all";
+                tabLogin.className = "py-2.5 text-center font-bold text-sm rounded-xl text-slate-500 hover:text-teal-700 transition-all";
+            }
+        }
+
+        // تنظيف رقم السجل التجاري وتوحيد أرقامه (عربي/إنجليزي) ليصلح كمفتاح موحد في Firebase
+        function sanitizeKey(str) {
+            const unified = toEnglishDigits(str.trim());
+            return unified.replace(/[.#$\[\]\/\\]/g, '_');
+        }
+
+        // ==========================================================
+        // 1. تسجيل صيدلية جديدة بكلمة مرور مشفرة SHA-256
+        // ==========================================================
+        async function handleRegister(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-reg-submit');
+            const originalHTML = btn.innerHTML;
+
+            const name = document.getElementById('reg-name').value.trim();
+            const crRaw = document.getElementById('reg-cr').value.trim();
+            const crCode = sanitizeKey(crRaw);
+            const taxId = document.getElementById('reg-tax').value.trim();
+            const phone = document.getElementById('reg-phone').value.trim();
+            const password = toEnglishDigits(document.getElementById('reg-pass').value.trim());
+            const address = document.getElementById('reg-address').value.trim();
+
+            if (!crCode || password.length < 4) {
+                showToast('يرجى إدخال سجل تجاري صحيح ورقم سري لا يقل عن ٤ أحرف', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>جاري تشفير البيانات والتسجيل...</span>';
+
+            try {
+                const dbUrl = _Vault.endpoint();
+                const checkRes = await fetch(`${dbUrl}/pharmacies/${crCode}.json`);
+                const existing = await checkRes.json();
+
+                if (existing) {
+                    showToast('رقم السجل التجاري مسجل بالفعل! يمكنك تسجيل الدخول مباشرة.', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = originalHTML;
+                    return;
+                }
+
+                const hashedPassword = await hashPasswordSHA256(password, crCode);
+
+                const pharmacyData = {
+                    facilityCode: crCode,
+                    commercialRegister: crRaw,
+                    name: name,
+                    taxCard: taxId,
+                    landline: phone,
+                    address: address,
+                    passwordHash: hashedPassword,
+                    lastInvoiceNumber: 0,
+                    createdAt: new Date().toISOString()
+                };
+
+                const saveRes = await fetch(`${dbUrl}/pharmacies/${crCode}.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(pharmacyData)
+                });
+
+                if (!saveRes.ok) throw new Error('فشل الاتصال بالخادم السحابي');
+
+                const safeSessionData = { ...pharmacyData };
+                delete safeSessionData.passwordHash;
+
+                showToast(`تم تسجيل الصيدلية بنجاح! كود المنشأة: ${toArabicDigits(crRaw)}`, 'success');
+                currentPharmacy = safeSessionData;
+                sessionStorage.setItem('active_pharmacy_v2', JSON.stringify(currentPharmacy));
+                enterDashboard();
+
+            } catch (error) {
+                console.error(error);
+                showToast('حدث خطأ أثناء الاتصال بالخادم السحابي، تأكد من الإنترنت', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        }
+
+        // ==========================================================
+        // 2. تسجيل الدخول الآمن والتحقق المشفر (يدعم الأرقام العربية والإنجليزية)
+        // ==========================================================
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-login-submit');
+            const originalHTML = btn.innerHTML;
+
+            const crRaw = document.getElementById('login-cr').value.trim();
+            const crCode = sanitizeKey(crRaw);
+            const password = toEnglishDigits(document.getElementById('login-pass').value.trim());
+
+            if (!crCode || !password) {
+                showToast('يرجى إدخال السجل التجاري والرقم السري', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>جاري التحقق المشفر...</span>';
+
+            try {
+                const dbUrl = _Vault.endpoint();
+                const res = await fetch(`${dbUrl}/pharmacies/${crCode}.json`);
+                
+                if (!res.ok) {
+                    throw new Error(`HTTP Error: ${res.status}`);
+                }
+
+                const pharmacyData = await res.json();
+
+                if (!pharmacyData) {
+                    showToast('رقم السجل التجاري غير مسجل في النظام! يرجى تسجيل الصيدلية أولاً.', 'error');
+                } else {
+                    const inputHash = await hashPasswordSHA256(password, crCode);
+                    const storedPlainNormalized = pharmacyData.password ? toEnglishDigits(String(pharmacyData.password)) : '';
+                    const isValid = (pharmacyData.passwordHash && pharmacyData.passwordHash === inputHash) || 
+                                    (storedPlainNormalized && storedPlainNormalized === password);
+
+                    if (!isValid) {
+                        showToast('الرقم السري غير صحيح، يرجى التأكد والمحاولة مرة أخرى.', 'error');
+                    } else {
+                        const safeSessionData = { ...pharmacyData };
+                        delete safeSessionData.passwordHash;
+                        delete safeSessionData.password;
+
+                        showToast(`أهلاً بك في ${pharmacyData.name}`, 'success');
+                        currentPharmacy = safeSessionData;
+                        sessionStorage.setItem('active_pharmacy_v2', JSON.stringify(currentPharmacy));
+                        enterDashboard();
+                    }
+                }
+            } catch (error) {
+                console.error('Login Error:', error);
+                showToast('تعذر الاتصال بالخادم السحابي، تأكد من اتصال الإنترنت.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        }
+
+        // الدخول إلى لوحة إنشاء الفواتير ومزامنة آخر رقم فاتورة
+        async function enterDashboard() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.remove('hidden');
+            document.getElementById('header-actions').classList.remove('hidden');
+
+            document.getElementById('disp-pharm-name').textContent = currentPharmacy.name;
+            document.getElementById('disp-pharm-tax').textContent = toArabicDigits(currentPharmacy.taxCard);
+            document.getElementById('disp-pharm-cr').textContent = toArabicDigits(currentPharmacy.commercialRegister);
+            document.getElementById('disp-pharm-phone').textContent = toArabicDigits(currentPharmacy.landline);
+
+            try {
+                const dbUrl = _Vault.endpoint();
+                const seqRes = await fetch(`${dbUrl}/pharmacies/${currentPharmacy.facilityCode}/lastInvoiceNumber.json`);
+                const latestSeq = await seqRes.json();
+                if (typeof latestSeq === 'number') {
+                    currentPharmacy.lastInvoiceNumber = latestSeq;
+                    sessionStorage.setItem('active_pharmacy_v2', JSON.stringify(currentPharmacy));
+                }
+            } catch (e) { /* استخدام الرقم المحلي في حالة ضعف الشبكة */ }
+
+            currentInvoiceNumber = (currentPharmacy.lastInvoiceNumber || 0) + 1;
+            document.getElementById('disp-invoice-number').textContent = toArabicDigits(String(currentInvoiceNumber).padStart(4, '0'));
+
+            resetInvoiceForm();
+        }
+
+        // تسجيل الخروج
+        function logoutPharmacy() {
+            currentPharmacy = null;
+            cachedInvoicesList = [];
+            sessionStorage.removeItem('active_pharmacy_v2');
+            document.getElementById('dashboard-section').classList.add('hidden');
+            document.getElementById('header-actions').classList.add('hidden');
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('login-pass').value = '';
+            showToast('تم تسجيل الخروج وتأمين الجلسة بنجاح', 'info');
+        }
+
+        // ==========================================================
+        // 3. إدارة صفوف الأصناف والحسابات التلقائية (جنيه وقرش)
+        // ==========================================================
+        function addItemRow() {
+            rowCounter++;
+            const tbody = document.getElementById('invoice-items-body');
+            const tr = document.createElement('tr');
+            tr.id = `item-row-${rowCounter}`;
+            tr.className = "hover:bg-teal-50/40 transition-colors group";
+
+            tr.innerHTML = `
+                <td class="py-2.5 px-2 text-center font-extrabold text-slate-500 border-l border-slate-200 row-index">١</td>
+                <td class="py-2.5 px-2 border-l border-slate-200">
+                    <input type="text" placeholder="اكتب اسم الدواء أو الصنف..." class="item-name w-full px-3 py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none text-sm font-bold text-slate-800">
+                </td>
+                <td class="py-2.5 px-2 border-l border-slate-200">
+                    <select class="item-unit w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none text-sm font-extrabold text-slate-700">
+                        <option value="علبة">علبة</option>
+                        <option value="شريط">شريط</option>
+                    </select>
+                </td>
+                <td class="py-2.5 px-2 border-l border-slate-200">
+                    <input type="text" inputmode="numeric" value="١" oninput="calculateTotals()" class="item-qty w-full text-center px-2 py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 outline-none font-extrabold text-slate-800">
+                </td>
+                <!-- قيمة القطعة: قرش ثم جنيه -->
+                <td class="py-2.5 px-1.5 border-l border-slate-200 w-20 bg-amber-50/30">
+                    <input type="text" inputmode="numeric" maxlength="2" placeholder="٠٠" oninput="validatePiasters(this); calculateTotals()" class="item-unit-piaster w-full text-center px-1.5 py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 outline-none font-bold text-slate-700">
+                </td>
+                <td class="py-2.5 px-1.5 border-l border-slate-200 w-24 bg-amber-50/30">
+                    <input type="text" inputmode="numeric" placeholder="٠" oninput="calculateTotals()" class="item-unit-pound w-full text-center px-1.5 py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 outline-none font-extrabold text-slate-800">
+                </td>
+                <!-- الإجمالي للصف: قرش ثم جنيه -->
+                <td class="py-2.5 px-1.5 border-l border-slate-200 w-20 bg-teal-50/40 text-center font-extrabold text-teal-800 row-total-piaster" data-val="0">٠٠</td>
+                <td class="py-2.5 px-1.5 border-l border-slate-200 w-24 bg-teal-50/40 text-center font-black text-teal-900 row-total-pound" data-val="0">٠</td>
+                <!-- زر حذف الصف -->
+                <td class="py-2.5 px-2 text-center">
+                    <button type="button" onclick="removeItemRow('${tr.id}')" class="text-slate-400 hover:text-rose-600 p-2 rounded-xl hover:bg-rose-50 transition" title="حذف الصنف">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </td>
+            `;
+
+            tbody.appendChild(tr);
+            updateRowNumbers();
+            calculateTotals();
+        }
+
+        // التأكد أن القروش لا تتخطى ٩٩ مع دعم الإدخال العربي والإنجليزي
+        function validatePiasters(input) {
+            const cleanEng = toEnglishDigits(input.value).replace(/[^0-9]/g, '');
+            let val = parseInt(cleanEng, 10);
+            if (!isNaN(val)) {
+                if (val > 99) input.value = toArabicDigits('99');
+                else if (val < 0) input.value = toArabicDigits('0');
+            }
+        }
+
+        // حذف صف صنف
+        function removeItemRow(rowId) {
+            const tbody = document.getElementById('invoice-items-body');
+            if (tbody.children.length <= 1) {
+                showToast('يجب أن تحتوي الفاتورة على صنف واحد على الأقل', 'info');
+                return;
+            }
+            const row = document.getElementById(rowId);
+            if (row) row.remove();
+            updateRowNumbers();
+            calculateTotals();
+        }
+
+        // إعادة ترقيم الصفوف بالأرقام العربية (١، ٢، ٣...)
+        function updateRowNumbers() {
+            const rows = document.querySelectorAll('#invoice-items-body tr');
+            rows.forEach((row, index) => {
+                row.querySelector('.row-index').textContent = toArabicDigits(index + 1);
+            });
+        }
+
+        // حساب إجماليات الصفوف والإجمالي الكلي والتفقيط بالأرقام العربية
+        function calculateTotals() {
+            const rows = document.querySelectorAll('#invoice-items-body tr');
+            let grandTotalInPiasters = 0;
+
+            rows.forEach(row => {
+                const qtyRaw = toEnglishDigits(row.querySelector('.item-qty').value);
+                const poundRaw = toEnglishDigits(row.querySelector('.item-unit-pound').value);
+                const piasterRaw = toEnglishDigits(row.querySelector('.item-unit-piaster').value);
+
+                const qty = Math.max(0, parseFloat(qtyRaw) || 0);
+                const unitPound = Math.max(0, parseInt(poundRaw, 10) || 0);
+                const unitPiaster = Math.max(0, parseInt(piasterRaw, 10) || 0);
+
+                const unitTotalPiasters = (unitPound * 100) + unitPiaster;
+                const rowTotalPiasters = Math.round(unitTotalPiasters * qty);
+
+                const rowPounds = Math.floor(rowTotalPiasters / 100);
+                const rowRemPiasters = rowTotalPiasters % 100;
+
+                const poundCell = row.querySelector('.row-total-pound');
+                const piasterCell = row.querySelector('.row-total-piaster');
+
+                poundCell.dataset.val = rowPounds;
+                piasterCell.dataset.val = rowRemPiasters;
+
+                poundCell.textContent = toArabicDigits(rowPounds);
+                piasterCell.textContent = toArabicDigits(String(rowRemPiasters).padStart(2, '0'));
+
+                grandTotalInPiasters += rowTotalPiasters;
+            });
+
+            const grandPounds = Math.floor(grandTotalInPiasters / 100);
+            const grandPiasters = grandTotalInPiasters % 100;
+            const formattedDecimal = `${grandPounds}.${String(grandPiasters).padStart(2, '0')}`;
+
+            const dispEl = document.getElementById('grand-total-display');
+            const poundsEl = document.getElementById('grand-total-pounds');
+            const piastersEl = document.getElementById('grand-total-piasters');
+
+            poundsEl.dataset.val = grandPounds;
+            piastersEl.dataset.val = grandPiasters;
+
+            dispEl.textContent = toArabicDigits(formattedDecimal);
+            poundsEl.textContent = toArabicDigits(grandPounds);
+            piastersEl.textContent = toArabicDigits(String(grandPiasters).padStart(2, '0'));
+
+            document.getElementById('total-arabic-words').textContent = tafqeetEgyptianPounds(grandPounds, grandPiasters);
+        }
+
+        // تفريغ الفاتورة لبدء فاتورة جديدة
+        function resetInvoiceForm() {
+            document.getElementById('patient-name').value = '';
+            setTodayDate();
+            const tbody = document.getElementById('invoice-items-body');
+            tbody.innerHTML = '';
+            rowCounter = 0;
+            addItemRow();
+        }
+
+        // ==========================================================
+        // 4. محرك التفقيط العربي الدقيق (جنيه مصري وقرش)
+        // ==========================================================
+        function tafqeetEgyptianPounds(pounds, piasters) {
+            if (pounds === 0 && piasters === 0) {
+                return "صفر جنيهاً مصرياً لا غير";
+            }
+
+            const ones = ["", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة"];
+            const tens = ["", "عشرة", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"];
+            const teens = ["عشرة", "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر", "سبعة عشر", "ثمانية عشر", "تسعة عشر"];
+            const hundreds = ["", "مائة", "مائتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعمائة"];
+
+            function convertUnder1000(n) {
+                if (n === 0) return "";
+                let parts = [];
+                const h = Math.floor(n / 100);
+                const rem = n % 100;
+
+                if (h > 0) parts.push(hundreds[h]);
+
+                if (rem > 0) {
+                    if (rem < 10) {
+                        parts.push(ones[rem]);
+                    } else if (rem >= 10 && rem < 20) {
+                        parts.push(teens[rem - 10]);
+                    } else {
+                        const o = rem % 10;
+                        const t = Math.floor(rem / 10);
+                        if (o > 0) {
+                            parts.push(ones[o] + " و" + tens[t]);
+                        } else {
+                            parts.push(tens[t]);
+                        }
+                    }
+                }
+                return parts.join(" و");
+            }
+
+            function convertNumber(num) {
+                if (num === 0) return "";
+                if (num >= 1000000) {
+                    const millions = Math.floor(num / 1000000);
+                    const rem = num % 1000000;
+                    let mText = millions === 1 ? "مليون" : millions === 2 ? "مليونان" : (millions >= 3 && millions <= 10) ? convertUnder1000(millions) + " ملايين" : convertUnder1000(millions) + " مليوناً";
+                    return rem > 0 ? mText + " و" + convertNumber(rem) : mText;
+                }
+                if (num >= 1000) {
+                    const thousands = Math.floor(num / 1000);
+                    const rem = num % 1000;
+                    let tText = thousands === 1 ? "ألف" : thousands === 2 ? "ألفان" : (thousands >= 3 && thousands <= 10) ? convertUnder1000(thousands) + " آلاف" : convertUnder1000(thousands) + " ألفاً";
+                    return rem > 0 ? tText + " و" + convertUnder1000(rem) : tText;
+                }
+                return convertUnder1000(num);
+            }
+
+            let resultParts = [];
+
+            if (pounds > 0) {
+                const poundWords = convertNumber(pounds);
+                let currencyUnit = "جنيهاً مصرياً";
+                if (pounds === 1) currencyUnit = "جنيه مصري واحد";
+                else if (pounds === 2) currencyUnit = "جنيهان مصريان";
+                else if (pounds >= 3 && pounds <= 10) currencyUnit = "جنيهات مصرية";
+                
+                if (pounds === 1 || pounds === 2) {
+                    resultParts.push(currencyUnit);
+                } else {
+                    resultParts.push(`${poundWords} ${currencyUnit}`);
+                }
+            }
+
+            if (piasters > 0) {
+                const piasterWords = convertNumber(piasters);
+                let piasterUnit = "قرشاً";
+                if (piasters === 1) piasterUnit = "قرش واحد";
+                else if (piasters === 2) piasterUnit = "قرشان";
+                else if (piasters >= 3 && piasters <= 10) piasterUnit = "قروش";
+
+                if (piasters === 1 || piasters === 2) {
+                    resultParts.push(piasterUnit);
+                } else {
+                    resultParts.push(`${piasterWords} ${piasterUnit}`);
+                }
+            }
+
+            return "فقط " + resultParts.join(" و") + " لا غير";
+        }
+
+        // ==========================================================
+        // 5. الحفظ في قاعدة البيانات وتجهيز الطباعة الحرارية 80mm
+        // ==========================================================
+        async function saveAndPrintInvoice() {
+            const rows = document.querySelectorAll('#invoice-items-body tr');
+            const items = [];
+
+            rows.forEach((row, idx) => {
+                const name = row.querySelector('.item-name').value.trim();
+                const unit = row.querySelector('.item-unit').value;
+                const qty = parseFloat(toEnglishDigits(row.querySelector('.item-qty').value)) || 0;
+                const unitPound = parseInt(toEnglishDigits(row.querySelector('.item-unit-pound').value), 10) || 0;
+                const unitPiaster = parseInt(toEnglishDigits(row.querySelector('.item-unit-piaster').value), 10) || 0;
+                const totalPound = parseInt(row.querySelector('.row-total-pound').dataset.val, 10) || 0;
+                const totalPiaster = parseInt(row.querySelector('.row-total-piaster').dataset.val, 10) || 0;
+
+                if (name !== "" && qty > 0) {
+                    items.push({
+                        index: idx + 1,
+                        name,
+                        unit,
+                        qty,
+                        unitPound,
+                        unitPiaster,
+                        totalPound,
+                        totalPiaster
+                    });
+                }
+            });
+
+            if (items.length === 0) {
+                showToast('يرجى إدخال اسم صنف واحد على الأقل مع السعر والكمية', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('btn-save-print');
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>جاري الحفظ السحابي وتجهيز الطباعة...</span>';
+
+            const patientName = document.getElementById('patient-name').value.trim() || 'عميل نقدي';
+            const invoiceDate = document.getElementById('invoice-date').value;
+            const grandPounds = parseInt(document.getElementById('grand-total-pounds').dataset.val, 10) || 0;
+            const grandPiasters = parseInt(document.getElementById('grand-total-piasters').dataset.val, 10) || 0;
+            const arabicWords = document.getElementById('total-arabic-words').textContent;
+
+            try {
+                const dbUrl = _Vault.endpoint();
+                const seqRes = await fetch(`${dbUrl}/pharmacies/${currentPharmacy.facilityCode}/lastInvoiceNumber.json`);
+                const serverLastSeq = await seqRes.json();
+                if (typeof serverLastSeq === 'number' && serverLastSeq >= currentInvoiceNumber) {
+                    currentInvoiceNumber = serverLastSeq + 1;
+                }
+
+                const formattedInvNum = String(currentInvoiceNumber).padStart(4, '0');
+
+                const invoiceRecord = {
+                    invoiceNumber: formattedInvNum,
+                    invoiceSeq: currentInvoiceNumber,
+                    pharmacyCode: currentPharmacy.facilityCode,
+                    pharmacyName: currentPharmacy.name,
+                    taxCard: currentPharmacy.taxCard,
+                    commercialRegister: currentPharmacy.commercialRegister,
+                    patientName,
+                    date: invoiceDate,
+                    items,
+                    totalPounds: grandPounds,
+                    totalPiasters: grandPiasters,
+                    arabicTotal: arabicWords,
+                    createdAt: new Date().toISOString()
+                };
+
+                const invRes = await fetch(`${dbUrl}/invoices/${currentPharmacy.facilityCode}/${formattedInvNum}.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(invoiceRecord)
+                });
+
+                if (!invRes.ok) throw new Error('فشل حفظ الفاتورة');
+
+                await fetch(`${dbUrl}/pharmacies/${currentPharmacy.facilityCode}/lastInvoiceNumber.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentInvoiceNumber)
+                });
+
+                currentPharmacy.lastInvoiceNumber = currentInvoiceNumber;
+                sessionStorage.setItem('active_pharmacy_v2', JSON.stringify(currentPharmacy));
+                
+                cachedInvoicesList.unshift(invoiceRecord);
+
+                populateAndTriggerPrint(invoiceRecord);
+
+                showToast(`تم حفظ الفاتورة رقم ${toArabicDigits(formattedInvNum)} وتأمينها سحابياً!`, 'success');
+
+                currentInvoiceNumber++;
+                document.getElementById('disp-invoice-number').textContent = toArabicDigits(String(currentInvoiceNumber).padStart(4, '0'));
+                resetInvoiceForm();
+
+            } catch (error) {
+                console.error(error);
+                showToast('حدث خطأ أثناء الحفظ السحابي، سيتم فتح الطباعة محلياً.', 'error');
+                const fallbackInv = {
+                    invoiceNumber: String(currentInvoiceNumber).padStart(4, '0'),
+                    patientName,
+                    date: invoiceDate,
+                    items,
+                    totalPounds: grandPounds,
+                    totalPiasters: grandPiasters,
+                    arabicTotal: arabicWords
+                };
+                populateAndTriggerPrint(fallbackInv);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        }
+
+        // تعبئة بيانات إيصال 80mm بالأرقام العربية وتشغيل أمر الطباعة
+        function populateAndTriggerPrint(inv) {
+            document.getElementById('print-pharm-name').textContent = currentPharmacy.name;
+            document.getElementById('print-pharm-tax').textContent = toArabicDigits(currentPharmacy.taxCard);
+            document.getElementById('print-pharm-cr').textContent = toArabicDigits(currentPharmacy.commercialRegister);
+            document.getElementById('print-pharm-address').textContent = toArabicDigits(currentPharmacy.address);
+            document.getElementById('print-pharm-phone').textContent = toArabicDigits(currentPharmacy.landline);
+
+            document.getElementById('print-inv-num').textContent = toArabicDigits(inv.invoiceNumber);
+            document.getElementById('print-patient-name').textContent = inv.patientName;
+            document.getElementById('print-inv-date').textContent = toArabicDigits(inv.date);
+
+            const printBody = document.getElementById('print-items-body');
+            printBody.innerHTML = '';
+
+            inv.items.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${toArabicDigits(index + 1)}</td>
+                    <td class="text-right-important" style="font-weight: 700;">${escapeHTML(item.name)} <span style="font-size: 8.5px; font-weight: normal;">(${escapeHTML(item.unit)})</span></td>
+                    <td>${toArabicDigits(item.qty)}</td>
+                    <td>${toArabicDigits(String(item.unitPiaster).padStart(2, '0'))}</td>
+                    <td>${toArabicDigits(item.unitPound)}</td>
+                    <td>${toArabicDigits(String(item.totalPiaster).padStart(2, '0'))}</td>
+                    <td style="font-weight: 800;">${toArabicDigits(item.totalPound)}</td>
+                `;
+                printBody.appendChild(tr);
+            });
+
+            document.getElementById('print-total-piasters').textContent = toArabicDigits(String(inv.totalPiasters).padStart(2, '0'));
+            document.getElementById('print-total-pounds').textContent = toArabicDigits(inv.totalPounds);
+            document.getElementById('print-arabic-words').textContent = inv.arabicTotal;
+
+            setTimeout(() => {
+                window.print();
+            }, 250);
+        }
+
+        // ==========================================================
+        // 6. سجل الفواتير المتقدم والبحث برقم الفاتورة أو اسم العميل
+        // ==========================================================
+        async function openHistoryModal(forceRefresh = false) {
+            const modal = document.getElementById('history-modal');
+            const container = document.getElementById('history-list-container');
+            const searchInput = document.getElementById('history-search-input');
+            
+            modal.classList.remove('hidden');
+            searchInput.value = '';
+
+            if (!forceRefresh && cachedInvoicesList.length > 0) {
+                renderHistoryList(cachedInvoicesList);
+                return;
+            }
+
+            container.innerHTML = '<div class="text-center py-10 text-teal-700 font-bold"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 block"></i> جاري جلب أرشيف الفواتير من السحابة...</div>';
+
+            try {
+                const dbUrl = _Vault.endpoint();
+                const res = await fetch(`${dbUrl}/invoices/${currentPharmacy.facilityCode}.json?orderBy="$key"&limitToLast=500`);
+                const data = await res.json();
+
+                if (!data) {
+                    cachedInvoicesList = [];
+                    renderHistoryList([]);
+                    return;
+                }
+
+                cachedInvoicesList = Object.values(data).sort((a, b) => (b.invoiceSeq || 0) - (a.invoiceSeq || 0));
+                renderHistoryList(cachedInvoicesList);
+
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = '<div class="text-center py-8 text-rose-600 font-bold"><i class="fa-solid fa-triangle-exclamation ml-1"></i> حدث خطأ أثناء تحميل السجل من الخادم.</div>';
+            }
+        }
+
+        // فلترة الفواتير لحظياً أثناء الكتابة (برقم الفاتورة العربي/الإنجليزي أو اسم العميل أو التاريخ)
+        function filterHistoryInvoices() {
+            const rawQuery = document.getElementById('history-search-input').value.trim().toLowerCase();
+            if (!rawQuery) {
+                renderHistoryList(cachedInvoicesList);
+                return;
+            }
+
+            const query = toEnglishDigits(rawQuery);
+            const numericQuery = query.replace(/^0+/, '');
+
+            const filtered = cachedInvoicesList.filter(inv => {
+                const invNum = toEnglishDigits(String(inv.invoiceNumber || '')).toLowerCase();
+                const invNumNoZero = invNum.replace(/^0+/, '');
+                const patient = String(inv.patientName || '').toLowerCase();
+                const date = toEnglishDigits(String(inv.date || '')).toLowerCase();
+
+                return invNum.includes(query) || 
+                       (numericQuery && invNumNoZero.includes(numericQuery)) ||
+                       patient.includes(rawQuery) ||
+                       date.includes(query);
+            });
+
+            renderHistoryList(filtered);
+        }
+
+        // رسم بطاقات الفواتير في السجل بالأرقام العربية
+        function renderHistoryList(list) {
+            const container = document.getElementById('history-list-container');
+            const badge = document.getElementById('history-count-badge');
+            badge.textContent = `${toArabicDigits(list.length)} فاتورة`;
+
+            if (list.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-slate-500">
+                        <i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-2 block"></i>
+                        <p class="font-bold">لا توجد فواتير مطابقة لبحثك</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+
+            list.forEach(inv => {
+                const card = document.createElement('div');
+                card.className = "border border-slate-200 rounded-2xl p-4 hover:border-teal-500 transition bg-white shadow-sm flex flex-wrap items-center justify-between gap-3";
+                
+                const itemsPreview = (inv.items || []).map(i => escapeHTML(i.name)).slice(0, 3).join('، ') + ((inv.items || []).length > 3 ? '...' : '');
+                const formattedTotal = toArabicDigits(`${inv.totalPounds}.${String(inv.totalPiasters).padStart(2, '0')}`);
+
+                card.innerHTML = `
+                    <div class="space-y-1 flex-grow">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="bg-rose-50 text-rose-700 border border-rose-200 font-black px-2.5 py-0.5 rounded-lg text-xs tracking-wider">فاتورة #${escapeHTML(toArabicDigits(inv.invoiceNumber))}</span>
+                            <span class="font-extrabold text-slate-800 text-sm sm:text-base"><i class="fa-solid fa-user text-teal-600 ml-1 text-xs"></i>${escapeHTML(inv.patientName)}</span>
+                        </div>
+                        <div class="text-xs text-slate-500 flex flex-wrap items-center gap-x-4 gap-y-1 font-semibold">
+                            <span><i class="fa-regular fa-calendar ml-1 text-slate-400"></i>${escapeHTML(toArabicDigits(inv.date))}</span>
+                            <span><i class="fa-solid fa-pills ml-1 text-slate-400"></i>${itemsPreview || 'بدون أصناف'}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 mr-auto">
+                        <div class="text-left bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                            <span class="text-[10px] text-slate-400 font-bold block">الإجمالي</span>
+                            <span class="font-black text-teal-800 text-sm sm:text-base">${formattedTotal} <small>ج.م</small></span>
+                        </div>
+                        <button type="button" class="reprint-btn bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-print"></i>
+                            <span>طباعة ٨٠ مم</span>
+                        </button>
+                    </div>
+                `;
+
+                card.querySelector('.reprint-btn').addEventListener('click', () => {
+                    reprintOldInvoice(inv);
+                });
+
+                container.appendChild(card);
+            });
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('history-modal').classList.add('hidden');
+        }
+
+        function reprintOldInvoice(inv) {
+            closeHistoryModal();
+            populateAndTriggerPrint(inv);
+        }
+
+        // ==========================================================
+        // 7. إدارة إعدادات الصيدلية وتحديث البيانات والرقم السري
+        // ==========================================================
+        function openSettingsModal() {
+            if (!currentPharmacy) return;
+            document.getElementById('set-cr').value = currentPharmacy.commercialRegister;
+            document.getElementById('set-name').value = currentPharmacy.name;
+            document.getElementById('set-tax').value = currentPharmacy.taxCard;
+            document.getElementById('set-phone').value = currentPharmacy.landline;
+            document.getElementById('set-address').value = currentPharmacy.address;
+
+            document.getElementById('set-old-pass').value = '';
+            document.getElementById('set-new-pass').value = '';
+            document.getElementById('set-confirm-pass').value = '';
+
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        async function handleUpdatePharmacySettings(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-save-settings');
+            const originalHTML = btn.innerHTML;
+
+            const newName = document.getElementById('set-name').value.trim();
+            const newTax = document.getElementById('set-tax').value.trim();
+            const newPhone = document.getElementById('set-phone').value.trim();
+            const newAddress = document.getElementById('set-address').value.trim();
+
+            const oldPass = toEnglishDigits(document.getElementById('set-old-pass').value.trim());
+            const newPass = toEnglishDigits(document.getElementById('set-new-pass').value.trim());
+            const confirmPass = toEnglishDigits(document.getElementById('set-confirm-pass').value.trim());
+
+            const wantsPasswordChange = oldPass !== '' || newPass !== '' || confirmPass !== '';
+
+            if (wantsPasswordChange) {
+                if (!oldPass) {
+                    showToast('يرجى إدخال الرقم السري الحالي لتأكيد هويتك', 'error');
+                    return;
+                }
+                if (newPass.length < 4) {
+                    showToast('يجب أن يكون الرقم السري الجديد ٤ أحرف على الأقل', 'error');
+                    return;
+                }
+                if (newPass !== confirmPass) {
+                    showToast('الرقم السري الجديد وتأكيده غير متطابقين!', 'error');
+                    return;
+                }
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>جاري التحقق وتحديث البيانات...</span>';
+
+            try {
+                const dbUrl = _Vault.endpoint();
+                const crCode = currentPharmacy.facilityCode;
+
+                const updates = {
+                    name: newName,
+                    taxCard: newTax,
+                    landline: newPhone,
+                    address: newAddress,
+                    updatedAt: new Date().toISOString()
+                };
+
+                if (wantsPasswordChange) {
+                    const res = await fetch(`${dbUrl}/pharmacies/${crCode}.json`);
+                    const serverRecord = await res.json();
+
+                    if (!serverRecord) {
+                        throw new Error('لم يتم العثور على سجل الصيدلية');
+                    }
+
+                    const oldHash = await hashPasswordSHA256(oldPass, crCode);
+                    const storedPlainNormalized = serverRecord.password ? toEnglishDigits(String(serverRecord.password)) : '';
+                    const isOldValid = (serverRecord.passwordHash && serverRecord.passwordHash === oldHash) ||
+                                       (storedPlainNormalized && storedPlainNormalized === oldPass);
+
+                    if (!isOldValid) {
+                        showToast('الرقم السري الحالي غير صحيح! لم يتم حفظ التعديلات.', 'error');
+                        btn.disabled = false;
+                        btn.innerHTML = originalHTML;
+                        return;
+                    }
+
+                    updates.passwordHash = await hashPasswordSHA256(newPass, crCode);
+                    updates.password = null;
+                }
+
+                const patchRes = await fetch(`${dbUrl}/pharmacies/${crCode}.json`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updates)
+                });
+
+                if (!patchRes.ok) throw new Error('فشل تحديث البيانات السحابية');
+
+                currentPharmacy.name = newName;
+                currentPharmacy.taxCard = newTax;
+                currentPharmacy.landline = newPhone;
+                currentPharmacy.address = newAddress;
+                sessionStorage.setItem('active_pharmacy_v2', JSON.stringify(currentPharmacy));
+
+                document.getElementById('disp-pharm-name').textContent = newName;
+                document.getElementById('disp-pharm-tax').textContent = toArabicDigits(newTax);
+                document.getElementById('disp-pharm-phone').textContent = toArabicDigits(newPhone);
+
+                showToast(wantsPasswordChange ? 'تم تحديث بيانات الصيدلية والرقم السري بنجاح!' : 'تم حفظ تعديلات بيانات الصيدلية بنجاح!', 'success');
+                closeSettingsModal();
+
+            } catch (error) {
+                console.error(error);
+                showToast('حدث خطأ أثناء الاتصال بالخادم، حاول مرة أخرى.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        }
+    </script>
+
+    <!-- ========================================================== -->
+    <!-- قالب الطباعة الحرارية 80mm (يظهر فقط أثناء الطباعة)        -->
+    <!-- ========================================================== -->
+    <div id="thermal-receipt-area" dir="rtl">
+        <!-- ترويسة الفاتورة وشعار الصيدلة -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1.5px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
+            <div style="text-align: right; flex: 1;">
+                <div id="print-pharm-name" style="font-size: 14px; font-weight: 800; line-height: 1.2;">اسم الصيدلية</div>
+                <div style="font-size: 10px; font-weight: 700; margin-top: 2px;">ب.ض: <span id="print-pharm-tax">-</span></div>
+                <div style="font-size: 10px; font-weight: 700;">سجل تجاري: <span id="print-pharm-cr">-</span></div>
+            </div>
+            <!-- شعار الصيدلة (كأس هيجيا) -->
+            <div style="width: 36px; text-align: left; padding-top: 2px;">
+                <svg width="32" height="36" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v20M8 6h8M7 6c0 4 2 6 5 6s5-2 5-6M9 22h6M12 12c-2.5 0-4 1.5-4 3.5S10.5 19 13 19s3.5-1.5 3.5-3"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- رقم الفاتورة -->
+        <div style="text-align: center; margin: 4px 0; font-size: 13px; font-weight: 800;">
+            <span>فـــاتـــورة ضريبية رقم: </span>
+            <span id="print-inv-num" style="letter-spacing: 1px; border: 1px solid #000; padding: 0 6px;">٠٠٠١</span>
+        </div>
+
+        <!-- بيانات العميل والتاريخ -->
+        <div style="font-size: 10.5px; margin-bottom: 5px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
+            <div style="margin-bottom: 2px;"><strong>الاسـم:</strong> <span id="print-patient-name">-</span></div>
+            <div><strong>التاريخ:</strong> <span id="print-inv-date">-</span></div>
+        </div>
+
+        <!-- جدول الأصناف مطابق لتقسيم الفاتورة الورقية -->
+        <table class="receipt-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" style="width: 18px;">م</th>
+                    <th rowspan="2">صــنــف</th>
+                    <th rowspan="2" style="width: 26px;">عدد</th>
+                    <th colspan="2">قيمة للقطعة</th>
+                    <th colspan="2">الإجمالي</th>
+                </tr>
+                <tr>
+                    <th style="width: 24px; font-size: 8.5px;">قرش</th>
+                    <th style="width: 30px; font-size: 8.5px;">جنيه</th>
+                    <th style="width: 24px; font-size: 8.5px;">قرش</th>
+                    <th style="width: 34px; font-size: 8.5px;">جنيه</th>
+                </tr>
+            </thead>
+            <tbody id="print-items-body">
+                <!-- الأصناف تطبع هنا -->
+            </tbody>
+            <tfoot>
+                <tr style="font-weight: 800; background-color: #f3f4f6;">
+                    <td colspan="5" style="text-align: right; padding-right: 5px;">الإجمـالـي الكـلـي:</td>
+                    <td id="print-total-piasters">٠٠</td>
+                    <td id="print-total-pounds" style="font-size: 11px;">٠</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- خانة التفقيط (فقط وقدره) -->
+        <div style="border: 1px solid #000; padding: 4px 5px; margin-top: 5px; font-size: 10px; font-weight: 700;">
+            <span>فقط وقدره: </span>
+            <span id="print-arabic-words">-</span>
+        </div>
+
+        <!-- تذييل الفاتورة: العنوان ورقم التليفون -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 4px; border-top: 1.5px solid #000; font-size: 9.5px; font-weight: 700;">
+            <span id="print-pharm-address" style="max-width: 65%; text-align: right;">العنوان</span>
+            <span style="text-align: left;">ت: <span id="print-pharm-phone">-</span></span>
+        </div>
+    </div>
+</body>
+</html>
